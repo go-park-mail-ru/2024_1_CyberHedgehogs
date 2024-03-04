@@ -1,42 +1,57 @@
 package handler
 
 import (
-	"encoding/json"
-	rep "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
-	"io"
+	repo "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
 	"net/http"
 	"time"
 )
 
-type SessionHandler struct {
-	sessionTable *rep.SessionTable
+const (
+	SessionCookieName    = "session_id"
+	SessionCookieExpires = repo.SessionLiveTime
+)
+
+func setSessionCookie(w http.ResponseWriter, sessionID string) {
+	cookie := &http.Cookie{
+		Name:    SessionCookieName,
+		Value:   sessionID,
+		Expires: time.Now().Add(SessionCookieExpires),
+	}
+	http.SetCookie(w, cookie)
 }
 
-func NewSessionHandler(users *rep.UserTable) *SessionHandler { // users по указателю?
+type SessionManager interface {
+	AddSession(user repo.User) (sessionID string, err error)
+	DeleteSession(sessionID string) error
+	CheckSession(sessionID string) (user *repo.UserSessionInfo)
+}
 
-	sessionTable := &rep.SessionTable{
-		Sessions: make(map[string]rep.Session),
-		Users:    users.Users,
-	}
+type SessionHandler struct {
+	manager SessionManager
+}
 
-	return &SessionHandler{
-		sessionTable: sessionTable,
+func NewSessionsGoController(sessions *repo.SessionTable, users *repo.UserTable) SessionManager {
+	controller := &repo.SessionsGoController{SessionsTabl: sessions, UsersTabl: users}
+	return controller
+}
+
+func NewSessionHandler(sesManager SessionManager) SessionHandler {
+
+	sessionHandler := SessionHandler{
+		manager: sesManager,
 	}
+	return sessionHandler
 }
 
 func (api *SessionHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	sessionCookie, err := r.Cookie("session_id")
 	if err != nil {
-		if err == http.ErrNoCookie {
-			http.Error(w, `{"error": "Session cookie not found"}`, http.StatusBadRequest)
-		} else {
-			http.Error(w, `{"error": "Error retrieving session cookie"}`, http.StatusBadRequest)
-		}
+		http.Error(w, `no cookie`, http.StatusOK)
 		return
 	}
 
-	err = api.sessionTable.DeleteSession(sessionCookie.Value)
+	err = api.manager.DeleteSession(sessionCookie.Value)
 	if err != nil {
 		http.Error(w, `error deleting session`, http.StatusBadRequest)
 		return
@@ -45,36 +60,18 @@ func (api *SessionHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *SessionHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var user repo.User
+	renderer := repo.Renderer{}
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, `{"error": "Error reading request body"}`, http.StatusBadRequest)
+	if err := renderer.DecodeJSON(r.Body, &user); err != nil {
+		http.Error(w, `"error": "Invalid JSON format"`, http.StatusBadRequest)
 		return
 	}
 
-	var user rep.User
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		http.Error(w, `{"error": "Invalid JSON format"}`, http.StatusBadRequest)
-		return
-	}
-
-	if user.Login == "" || user.Password == "" {
-		http.Error(w, `{"error": "login and password fields cannot be empty"}`, http.StatusBadRequest)
-		return
-	}
-
-	sessionID, err := api.sessionTable.AddSession(user)
+	sessionID, err := api.manager.AddSession(user)
 	if err != nil {
 		http.Error(w, "wrong login or password", http.StatusBadRequest)
 		return
 	}
-
-	cookie := &http.Cookie{
-		Name:    "session_id",
-		Value:   sessionID,
-		Expires: time.Now().Add(10 * time.Minute),
-	}
-	http.SetCookie(w, cookie)
-
+	setSessionCookie(w, sessionID)
 }

@@ -1,19 +1,17 @@
 BINARY_NAME=Saudode
 
-SRC_DIR=./cmd
+SRC_DIR=./internal
 
 all: build
 
 build:
-	go build -o ${BINARY_NAME} ${SRC_DIR}/main.go
+	go build -o ${BINARY_NAME} ${SRC_DIR}
 
 run:
-	go run ${SRC_DIR}/main.go
-
-build_and_run: build run
+	go run ${SRC_DIR}
 
 test:
-	go test -v ${SRC_DIR}/...
+	go test -v ${SRC_DIR}
 
 clean:
 	go clean

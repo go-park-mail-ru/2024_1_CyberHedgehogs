@@ -8,12 +8,17 @@ import (
 )
 
 func main() {
-	userTable := rep.UserTable{}
+	userTabl := rep.UserTable{}
+	sessionTabl := rep.SessionTable{}
+	sesContorller := handler.NewSessionsGoController(&sessionTabl, &userTabl)
 	r := mux.NewRouter()
-	api := handler.NewUserHandler(&userTable)
-	api2 := handler.NewSessionHandler(&userTable)
-	r.HandleFunc("POST /register", api.Registration)
-	r.HandleFunc("POST /login", api2.Login)
-	r.HandleFunc("POST /login", api2.Logout)
+
+	api := handler.NewRegistrationHandler(&userTabl)
+	api2 := handler.NewSessionHandler(sesContorller)
+
+	r.HandleFunc("/register", api.Registration).Methods("POST")
+	r.HandleFunc("/login", api2.Login).Methods("POST")
+	r.HandleFunc("/logout", api2.Logout).Methods("POST")
+
 	http.ListenAndServe(":8080", r)
 }

@@ -1,8 +1,11 @@
 package repository
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"math/rand"
+	"net/http"
 	"regexp"
 	"sync"
 	"time"
@@ -10,13 +13,16 @@ import (
 
 var nextUserID uint = 1
 
+const SessionLiveTime = 10 * time.Minute
+
+var emailRegex = regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+
 type User struct {
 	ID       uint   `json:"id,omitempty"`
 	Login    string `json:"login,omitempty"`
 	Username string `json:"username,omitempty"`
 	Email    string `json:"email,omitempty"`
 	Password string `json:"password,omitempty"`
-	Role     string `json:"role,omitempty"`
 }
 
 type UserTable struct {
@@ -29,21 +35,15 @@ type Info struct {
 }
 
 func (table *UserTable) AddUser(user User) error {
-	table.mu.Lock()
-	defer table.mu.Unlock()
-
-	err := ValidateNewUser(user, table)
-	if err != nil {
-		return err
-	}
 	user.ID = nextUserID
 	nextUserID++
+	table.mu.Lock()
 	table.Users[user.Login] = &user
+	table.mu.Unlock()
 	return nil
 }
 
-func ValidateNewUser(user User, table *UserTable) error {
-	emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+func (table *UserTable) ValidateNewUser(user User) error {
 	if !emailRegex.MatchString(user.Email) {
 		return errors.New("неверный формат email")
 	}
@@ -63,30 +63,43 @@ func ValidateNewUser(user User, table *UserTable) error {
 		return errors.New("пароль должен быть не менее 6 символов")
 	}
 
-	allowedRoles := []string{"user", "creator"}
-	roleIsValid := false
-	for _, r := range allowedRoles {
-		if user.Role == r {
-			roleIsValid = true
-			break
-		}
-	}
-	if !roleIsValid {
-		return errors.New("недопустимая роль")
-	}
-
 	return nil
 }
 
+type UserSessionInfo struct {
+	ID    uint   `json:"id,omitempty"`
+	Login string `json:"login"`
+}
 type Session struct {
 	ExpirationDate time.Time
-	User           *User  `json:"user"`
-	Id             string `json:"session_id"`
+	User           *UserSessionInfo `json:"user_info"`
+	ID             string           `json:"session_id"`
 }
+
 type SessionTable struct {
 	Sessions map[string]Session
-	Users    map[string]*User
 	mu       sync.Mutex
+}
+
+func (table *SessionTable) IsActiveSession(sessionID string) (user *UserSessionInfo) {
+	nowTime := time.Now()
+	table.mu.Lock()
+	if session, ok := table.Sessions[sessionID]; ok {
+		if session.ExpirationDate.Before(nowTime) {
+			delete(table.Sessions, sessionID)
+			table.mu.Unlock()
+			return nil
+		}
+		table.mu.Unlock()
+		return session.User
+	}
+	table.mu.Unlock()
+	return nil
+}
+
+type SessionsGoController struct {
+	SessionsTabl *SessionTable
+	UsersTabl    *UserTable
 }
 
 var (
@@ -101,58 +114,72 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func (table *SessionTable) sessionsCleanup() {
-	table.mu.Lock()
-	defer table.mu.Unlock()
-	for sessionID, session := range table.Sessions {
-		if session.ExpirationDate.Before(time.Now()) {
-			delete(table.Sessions, sessionID)
+func (table *SessionsGoController) sessionsCleanup() {
+	table.SessionsTabl.mu.Lock()
+	for sessionID, sessn := range table.SessionsTabl.Sessions {
+		if sessn.ExpirationDate.Before(time.Now()) {
+			delete(table.SessionsTabl.Sessions, sessionID)
 		}
 	}
+	table.UsersTabl.mu.Unlock()
 	return
 }
 
-func (table *SessionTable) DeleteSession(sessionID string) error {
-	table.mu.Lock()
-	defer table.mu.Unlock()
-	if _, ok := table.Sessions[sessionID]; ok {
-		delete(table.Sessions, sessionID)
+func (table *SessionsGoController) DeleteSession(sessionID string) error {
+	table.SessionsTabl.mu.Lock()
+	if _, ok := table.SessionsTabl.Sessions[sessionID]; ok {
+		delete(table.SessionsTabl.Sessions, sessionID)
+		table.SessionsTabl.mu.Unlock()
 		return nil
 	}
-	return errors.New("no such session")
+	table.UsersTabl.mu.Unlock()
+	return nil
 }
 
-// todo при уадлении пользователя надо удалить и его сессию!
-func (table *SessionTable) CheckSession(sessionID string) (user *User, err error) {
-	table.mu.Lock()
-	defer table.mu.Unlock()
-	if session, ok := table.Sessions[sessionID]; ok {
-		if session.ExpirationDate.Before(time.Now()) {
-			delete(table.Sessions, sessionID)
-			return nil, errors.New("session expired")
-		}
-		return session.User, nil
+func (table *SessionsGoController) CheckSession(sessionID string) (user *UserSessionInfo) {
+	if foundUser := table.SessionsTabl.IsActiveSession(sessionID); foundUser != nil {
+		return foundUser
 	}
-	return nil, errors.New("session not found")
+	return nil
 }
 
-// todo вызов удаления сессии
-func (table *SessionTable) AddSession(user User) (sessionID string, err error) {
-	table.mu.Lock()
-	defer table.mu.Unlock()
-
-	if tableUser, ok := table.Users[user.Login]; ok {
-		sessionID = RandStringRunes(28)
-		// todo проверка что мне "повезло" невероятным образом два ID выбить одинаковых
-		ses := Session{User: tableUser, ExpirationDate: time.Now().Add(10 * time.Minute), Id: sessionID} //todo длиннее сессию
-		table.Sessions[sessionID] = ses
-		return sessionID, nil
+func (table *SessionsGoController) AddSession(user User) (sessionID string, err error) {
+	if user.Login == "" {
+		return "", errors.New("unvalid login or password")
 	}
-	return "", errors.New("user not found")
+	table.UsersTabl.mu.Lock()
+	tableUser, ok := table.UsersTabl.Users[user.Login]
+	if !ok {
+		table.UsersTabl.mu.Unlock()
+		return "", errors.New("unvalid login or password")
+
+	}
+
+	table.UsersTabl.mu.Unlock()
+	if tableUser.Password != user.Password {
+		return "", errors.New("unvalid login or password")
+	}
+	sessionID = RandStringRunes(28)
+	newUser := UserSessionInfo{ID: tableUser.ID, Login: tableUser.Login}
+	ses := Session{User: &newUser, ExpirationDate: time.Now().Add(SessionLiveTime), ID: sessionID}
+	table.SessionsTabl.mu.Lock()
+	table.SessionsTabl.Sessions[sessionID] = ses
+	table.SessionsTabl.mu.Unlock()
+	return sessionID, nil
 }
 
-type SessionsController struct {
-	users    *UserTable
-	sessions *SessionTable
-	mu       sync.Mutex
+type Renderer struct{}
+
+func (r *Renderer) DecodeJSON(body io.ReadCloser, data any) error {
+	defer body.Close()
+	if err := json.NewDecoder(body).Decode(data); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Renderer) EncodeJSON(w http.ResponseWriter, statusCode int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(data)
 }
