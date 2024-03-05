@@ -109,6 +109,7 @@ func (table *SessionTable) CheckSession(sessionID string) (user *UserSessionInfo
 
 	if session, ok := table.Sessions[sessionID]; ok {
 		if session.ExpirationDate.Before(nowTime) {
+			delete(table.Sessions, sessionID)
 			return nil
 		}
 		return session.UserInfo
@@ -138,9 +139,6 @@ func (table *SessionTable) DeleteSession(sessionID string) error {
 }
 
 func (table *SessionTable) AddSession(user *UserSessionInfo) (sessionID string, err error) {
-	table.mu.Lock()
-	defer table.mu.Unlock()
-
 	sessionID = ulid.Make().String()
 	ses := Session{ExpirationDate: time.Now().Add(SessionLiveTime), UserInfo: user, ID: sessionID}
 	table.mu.Lock()

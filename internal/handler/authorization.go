@@ -53,10 +53,10 @@ func (api *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	err = api.sesManager.DeleteSession(sessionCookie.Value)
 	if err != nil {
-		http.Error(w, `error deleting session`, http.StatusBadRequest)
+		http.Error(w, `error deleting session`, http.StatusInternalServerError)
 		return
 	}
-
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (api *authHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -65,14 +65,19 @@ func (api *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `"error": "Invalid JSON format"`, http.StatusBadRequest)
 		return
 	}
-
-	userInfo := repo.UserSessionInfo{UserID: user.ID, Login: user.Login}
+	tableUser := api.userRepo.ValidateUserCredentials(&user)
+	if tableUser == nil {
+		http.Error(w, `"error": wrong credentials"`, http.StatusUnauthorized)
+		return
+	}
+	userInfo := repo.UserSessionInfo{UserID: tableUser.ID, Login: tableUser.Login}
 	sessionID, err := api.sesManager.AddSession(&userInfo)
 	if err != nil {
-		http.Error(w, "wrong login or password", http.StatusBadRequest)
+		http.Error(w, "wrong login or password", http.StatusUnauthorized)
 		return
 	}
 	setSessionCookie(w, sessionID)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (api *authHandler) Registration(w http.ResponseWriter, r *http.Request) {
@@ -82,15 +87,15 @@ func (api *authHandler) Registration(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "Invalid JSON format"}`, http.StatusBadRequest)
 		return
 	}
-
 	_, err = api.userRepo.AddUser(&user) // todo надо авторизовать пользователя
 	if err != nil {
-		http.Error(w, `{"error": "Error adding user"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error": "Error adding user"}`, http.StatusBadRequest)
 		return
 	}
 
 	mes := repo.Info{
 		Message: "success",
 	}
-	api.render.EncodeJSON(w, 200, mes)
+
+	api.render.EncodeJSON(w, http.StatusCreated, mes)
 }
