@@ -1,0 +1,30 @@
+# .golangci.yml
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.8
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+    disabled-checks:
+  gofmt:
+    simplify: true
+  gocyclo:
+    min-complexity: 15
+
+linters:
+  enable-all: true
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+run:
+  deadline: 5m
+  tests: false
+  skip-dirs:
+    - vendor
+    - .git

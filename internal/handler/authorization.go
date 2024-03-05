@@ -20,38 +20,38 @@ func setSessionCookie(w http.ResponseWriter, sessionID string) {
 	http.SetCookie(w, cookie)
 }
 
+type UserRepository interface {
+	AddUser(user *repo.User) (*repo.User, error)
+	ValidateUserCredentials(user *repo.User) *repo.User
+}
+
 type SessionManager interface {
-	AddSession(user repo.User) (sessionID string, err error)
+	AddSession(user *repo.UserSessionInfo) (sessionID string, err error)
 	DeleteSession(sessionID string) error
 	CheckSession(sessionID string) (user *repo.UserSessionInfo)
+	SessionsCleanup()
 }
 
-type SessionHandler struct {
-	manager SessionManager
+type authHandler struct {
+	sesManager SessionManager
+	userRepo   UserRepository
+	render     repo.Renderer
 }
 
-func NewSessionsGoController(sessions *repo.SessionTable, users *repo.UserTable) SessionManager {
-	controller := &repo.SessionsGoController{SessionsTabl: sessions, UsersTabl: users}
-	return controller
+func NewAuthHandler(ur UserRepository, sm SessionManager) authHandler {
+	handler := authHandler{sesManager: sm, userRepo: ur}
+	return handler
 }
 
-func NewSessionHandler(sesManager SessionManager) SessionHandler {
-
-	sessionHandler := SessionHandler{
-		manager: sesManager,
-	}
-	return sessionHandler
-}
-
-func (api *SessionHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (api *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	sessionCookie, err := r.Cookie("session_id")
 	if err != nil {
-		http.Error(w, `no cookie`, http.StatusOK)
+		http.Error(w, `no cookie`, http.StatusBadRequest)
 		return
 	}
 
-	err = api.manager.DeleteSession(sessionCookie.Value)
+	err = api.sesManager.DeleteSession(sessionCookie.Value)
 	if err != nil {
 		http.Error(w, `error deleting session`, http.StatusBadRequest)
 		return
@@ -59,19 +59,38 @@ func (api *SessionHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (api *SessionHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (api *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var user repo.User
-	renderer := repo.Renderer{}
-
-	if err := renderer.DecodeJSON(r.Body, &user); err != nil {
+	if err := api.render.DecodeJSON(r.Body, &user); err != nil {
 		http.Error(w, `"error": "Invalid JSON format"`, http.StatusBadRequest)
 		return
 	}
 
-	sessionID, err := api.manager.AddSession(user)
+	userInfo := repo.UserSessionInfo{UserID: user.ID, Login: user.Login}
+	sessionID, err := api.sesManager.AddSession(&userInfo)
 	if err != nil {
 		http.Error(w, "wrong login or password", http.StatusBadRequest)
 		return
 	}
 	setSessionCookie(w, sessionID)
+}
+
+func (api *authHandler) Registration(w http.ResponseWriter, r *http.Request) {
+	var user repo.User
+	err := api.render.DecodeJSON(r.Body, &user)
+	if err != nil {
+		http.Error(w, `{"error": "Invalid JSON format"}`, http.StatusBadRequest)
+		return
+	}
+
+	_, err = api.userRepo.AddUser(&user) // todo надо авторизовать пользователя
+	if err != nil {
+		http.Error(w, `{"error": "Error adding user"}`, http.StatusInternalServerError)
+		return
+	}
+
+	mes := repo.Info{
+		Message: "success",
+	}
+	api.render.EncodeJSON(w, 200, mes)
 }

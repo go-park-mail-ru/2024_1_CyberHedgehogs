@@ -3,8 +3,8 @@ package repository
 import (
 	"encoding/json"
 	"errors"
+	"github.com/oklog/ulid/v2"
 	"io"
-	"math/rand"
 	"net/http"
 	"regexp"
 	"sync"
@@ -27,23 +27,36 @@ type User struct {
 
 type UserTable struct {
 	Users map[string]*User
-	mu    sync.Mutex
+	mu    sync.RWMutex
 }
 
 type Info struct {
 	Message string `json:"message"`
 }
 
-func (table *UserTable) AddUser(user User) error {
-	user.ID = nextUserID
-	nextUserID++
+func (table *UserTable) ValidateUserCredentials(user *User) *User {
 	table.mu.Lock()
-	table.Users[user.Login] = &user
-	table.mu.Unlock()
+	defer table.mu.Unlock()
+	if us, ok := table.Users[user.Login]; ok && us.Password == user.Password { // todo  хэши паролей
+		return us
+	}
 	return nil
 }
 
-func (table *UserTable) ValidateNewUser(user User) error {
+func (table *UserTable) AddUser(user *User) (*User, error) {
+	err := table.ValidateNewUser(user)
+	if err != nil {
+		return user, err
+	}
+	user.ID = nextUserID
+	nextUserID++
+	table.mu.Lock()
+	table.Users[user.Login] = user
+	table.mu.Unlock()
+	return user, nil
+}
+
+func (table *UserTable) ValidateNewUser(user *User) error {
 	if !emailRegex.MatchString(user.Email) {
 		return errors.New("неверный формат email")
 	}
@@ -51,7 +64,9 @@ func (table *UserTable) ValidateNewUser(user User) error {
 	if len(user.Login) < 3 {
 		return errors.New("login должен быть не менее 3 символов")
 	}
+	table.mu.Lock()
 	_, exists := table.Users[user.Login]
+	table.mu.Unlock()
 	if exists {
 		return errors.New("пользователь с таким логином уже существует")
 	}
@@ -67,104 +82,70 @@ func (table *UserTable) ValidateNewUser(user User) error {
 }
 
 type UserSessionInfo struct {
-	ID    uint   `json:"id,omitempty"`
-	Login string `json:"login"`
+	UserID uint   `json:"user_id,omitempty"`
+	Login  string `json:"login"`
 }
+
+func (userInfo *UserSessionInfo) GetUserIDLogin(user *User) {
+	userInfo.UserID = user.ID
+	userInfo.Login = user.Login
+}
+
 type Session struct {
 	ExpirationDate time.Time
-	User           *UserSessionInfo `json:"user_info"`
+	UserInfo       *UserSessionInfo `json:"user_info"`
 	ID             string           `json:"session_id"`
 }
 
 type SessionTable struct {
-	Sessions map[string]Session
-	mu       sync.Mutex
+	Sessions map[string]*Session
+	mu       sync.RWMutex
 }
 
-func (table *SessionTable) IsActiveSession(sessionID string) (user *UserSessionInfo) {
+func (table *SessionTable) CheckSession(sessionID string) (user *UserSessionInfo) {
 	nowTime := time.Now()
 	table.mu.Lock()
+	defer table.mu.Unlock()
+
 	if session, ok := table.Sessions[sessionID]; ok {
 		if session.ExpirationDate.Before(nowTime) {
-			delete(table.Sessions, sessionID)
-			table.mu.Unlock()
 			return nil
 		}
-		table.mu.Unlock()
-		return session.User
+		return session.UserInfo
 	}
-	table.mu.Unlock()
 	return nil
 }
 
-type SessionsGoController struct {
-	SessionsTabl *SessionTable
-	UsersTabl    *UserTable
-}
-
-var (
-	letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-)
-
-func RandStringRunes(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
-
-func (table *SessionsGoController) sessionsCleanup() {
-	table.SessionsTabl.mu.Lock()
-	for sessionID, sessn := range table.SessionsTabl.Sessions {
+func (table *SessionTable) SessionsCleanup() {
+	table.mu.Lock()
+	for sessionID, sessn := range table.Sessions {
 		if sessn.ExpirationDate.Before(time.Now()) {
-			delete(table.SessionsTabl.Sessions, sessionID)
+			delete(table.Sessions, sessionID)
 		}
 	}
-	table.UsersTabl.mu.Unlock()
+	table.mu.Unlock()
 	return
 }
 
-func (table *SessionsGoController) DeleteSession(sessionID string) error {
-	table.SessionsTabl.mu.Lock()
-	if _, ok := table.SessionsTabl.Sessions[sessionID]; ok {
-		delete(table.SessionsTabl.Sessions, sessionID)
-		table.SessionsTabl.mu.Unlock()
+func (table *SessionTable) DeleteSession(sessionID string) error {
+	table.mu.Lock()
+	defer table.mu.Unlock()
+	if _, ok := table.Sessions[sessionID]; ok {
+		delete(table.Sessions, sessionID)
 		return nil
 	}
-	table.UsersTabl.mu.Unlock()
 	return nil
 }
 
-func (table *SessionsGoController) CheckSession(sessionID string) (user *UserSessionInfo) {
-	if foundUser := table.SessionsTabl.IsActiveSession(sessionID); foundUser != nil {
-		return foundUser
-	}
-	return nil
-}
+func (table *SessionTable) AddSession(user *UserSessionInfo) (sessionID string, err error) {
+	table.mu.Lock()
+	defer table.mu.Unlock()
 
-func (table *SessionsGoController) AddSession(user User) (sessionID string, err error) {
-	if user.Login == "" {
-		return "", errors.New("unvalid login or password")
-	}
-	table.UsersTabl.mu.Lock()
-	tableUser, ok := table.UsersTabl.Users[user.Login]
-	if !ok {
-		table.UsersTabl.mu.Unlock()
-		return "", errors.New("unvalid login or password")
-
-	}
-
-	table.UsersTabl.mu.Unlock()
-	if tableUser.Password != user.Password {
-		return "", errors.New("unvalid login or password")
-	}
-	sessionID = RandStringRunes(28)
-	newUser := UserSessionInfo{ID: tableUser.ID, Login: tableUser.Login}
-	ses := Session{User: &newUser, ExpirationDate: time.Now().Add(SessionLiveTime), ID: sessionID}
-	table.SessionsTabl.mu.Lock()
-	table.SessionsTabl.Sessions[sessionID] = ses
-	table.SessionsTabl.mu.Unlock()
+	sessionID = ulid.Make().String()
+	ses := Session{ExpirationDate: time.Now().Add(SessionLiveTime), UserInfo: user, ID: sessionID}
+	table.mu.Lock()
+	table.Sessions[sessionID] = &ses
+	table.mu.Unlock()
 	return sessionID, nil
 }
 
