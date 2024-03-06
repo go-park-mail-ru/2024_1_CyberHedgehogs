@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	repo "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
 	"net/http"
 	"time"
@@ -32,18 +33,18 @@ type SessionManager interface {
 	SessionsCleanup()
 }
 
-type authHandler struct {
+type AuthHandler struct {
 	sesManager SessionManager
 	userRepo   UserRepository
 	render     repo.Renderer
 }
 
-func NewAuthHandler(ur UserRepository, sm SessionManager) authHandler {
-	handler := authHandler{sesManager: sm, userRepo: ur}
+func NewAuthHandler(ur UserRepository, sm SessionManager) AuthHandler {
+	handler := AuthHandler{sesManager: sm, userRepo: ur}
 	return handler
 }
 
-func (api *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (api *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	sessionCookie, err := r.Cookie("session_id")
 	if err != nil {
@@ -59,7 +60,7 @@ func (api *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (api *authHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (api *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var user repo.User
 	if err := api.render.DecodeJSON(r.Body, &user); err != nil {
 		http.Error(w, `"error": "Invalid JSON format"`, http.StatusBadRequest)
@@ -80,22 +81,77 @@ func (api *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (api *authHandler) Registration(w http.ResponseWriter, r *http.Request) {
+func (api *AuthHandler) Registration(w http.ResponseWriter, r *http.Request) {
 	var user repo.User
 	err := api.render.DecodeJSON(r.Body, &user)
 	if err != nil {
 		http.Error(w, `{"error": "Invalid JSON format"}`, http.StatusBadRequest)
 		return
 	}
-	_, err = api.userRepo.AddUser(&user) // todo надо авторизовать пользователя
+	tableUser, err := api.userRepo.AddUser(&user)
 	if err != nil {
-		http.Error(w, `{"error": "Error adding user"}`, http.StatusBadRequest)
+		http.Error(w, `{"error": "Error adding user"}`, http.StatusInternalServerError)
+		return
+	}
+	userInfo := repo.UserSessionInfo{UserID: tableUser.ID, Login: tableUser.Login}
+
+	sessionID, err := api.sesManager.AddSession(&userInfo)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to create session: %v", err), http.StatusInternalServerError)
+		return
+	}
+	setSessionCookie(w, sessionID)
+	w.WriteHeader(http.StatusOK)
+}
+
+type Post struct {
+	ID          uint   `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Author      string `json:"author"`
+	AuthorID    int    `json:"author_id,omitempty"`
+}
+
+func (api *AuthHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
+	sessionCookie, err := r.Cookie("session_id")
+	if err != nil {
+		http.Error(w, "no cookie", http.StatusBadRequest)
 		return
 	}
 
-	mes := repo.Info{
-		Message: "success",
+	userInfo := api.sesManager.CheckSession(sessionCookie.Value)
+	if userInfo == nil {
+		http.Error(w, "session not found", http.StatusUnauthorized)
+		return
 	}
 
-	api.render.EncodeJSON(w, http.StatusCreated, mes)
+	userProfile := &repo.User{
+		ID:       1,
+		Login:    userInfo.Login,
+		Username: "mock_username",
+		Email:    "mock@example.com",
+	}
+
+	api.render.EncodeJSON(w, http.StatusOK, userProfile)
+}
+
+func (api *AuthHandler) GetUserPosts(w http.ResponseWriter, r *http.Request) {
+	sessionCookie, err := r.Cookie("session_id")
+	if err != nil {
+		http.Error(w, "no cookie", http.StatusBadRequest)
+		return
+	}
+
+	userInfo := api.sesManager.CheckSession(sessionCookie.Value)
+	if userInfo == nil {
+		http.Error(w, "session not found", http.StatusUnauthorized)
+		return
+	}
+
+	userPosts := []*Post{
+		{ID: 1, Title: "Mock Post 1", Description: "Description of Mock Post 1", Author: userInfo.Login},
+		{ID: 2, Title: "Mock Post 2", Description: "Description of Mock Post 2", Author: userInfo.Login},
+	}
+
+	api.render.EncodeJSON(w, http.StatusOK, userPosts)
 }

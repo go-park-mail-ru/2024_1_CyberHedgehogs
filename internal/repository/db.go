@@ -125,7 +125,6 @@ func (table *SessionTable) SessionsCleanup() {
 		}
 	}
 	table.mu.Unlock()
-	return
 }
 
 func (table *SessionTable) DeleteSession(sessionID string) error {

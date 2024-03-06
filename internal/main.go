@@ -16,5 +16,7 @@ func main() {
 	r.HandleFunc("/register", api.Registration).Methods("POST")
 	r.HandleFunc("/login", api.Login).Methods("POST")
 	r.HandleFunc("/logout", api.Logout).Methods("POST")
+	r.HandleFunc("/profile", api.GetUserProfile).Methods("GET")
+	r.HandleFunc("/posts", api.GetUserPosts).Methods("GET")
 	http.ListenAndServe(":8080", r)
 }
