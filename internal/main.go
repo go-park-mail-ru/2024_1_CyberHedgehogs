@@ -10,7 +10,9 @@ import (
 func main() {
 
 	userTable := &repo.UserTable{}
+	userTable.Users = make(map[string]*repo.User)
 	sessionTable := &repo.SessionTable{}
+	sessionTable.Sessions = make(map[string]*repo.Session)
 	api := handler.NewAuthHandler(userTable, sessionTable)
 	r := mux.NewRouter()
 	r.HandleFunc("/register", api.Registration).Methods("POST")
