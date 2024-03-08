@@ -100,6 +100,7 @@ func (api *AuthHandler) Registration(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("failed to create session: %v", err), http.StatusInternalServerError)
 		return
 	}
+
 	setSessionCookie(w, sessionID)
 	w.WriteHeader(http.StatusOK)
 }
@@ -126,7 +127,7 @@ func (api *AuthHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userProfile := &repo.User{
-		ID:       1,
+		ID:       userInfo.UserID,
 		Login:    userInfo.Login,
 		Username: "mock_username",
 		Email:    "mock@example.com",
@@ -147,10 +148,9 @@ func (api *AuthHandler) GetUserPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "session not found", http.StatusUnauthorized)
 		return
 	}
-
-	userPosts := []*Post{
-		{ID: 1, Title: "Mock Post 1", Description: "Description of Mock Post 1", Author: userInfo.Login},
-		{ID: 2, Title: "Mock Post 2", Description: "Description of Mock Post 2", Author: userInfo.Login},
+	userPosts := map[int]*Post{
+		1: {ID: 1, Title: "Mock Post 1", Description: "Description of Mock Post 1", Author: userInfo.Login},
+		2: {ID: 2, Title: "Mock Post 2", Description: "Description of Mock Post 2", Author: userInfo.Login},
 	}
 
 	api.render.EncodeJSON(w, http.StatusOK, userPosts)

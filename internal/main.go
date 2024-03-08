@@ -20,5 +20,5 @@ func main() {
 	r.HandleFunc("/logout", api.Logout).Methods("POST")
 	r.HandleFunc("/profile", api.GetUserProfile).Methods("GET")
 	r.HandleFunc("/posts", api.GetUserPosts).Methods("GET")
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(":8081", r)
 }
