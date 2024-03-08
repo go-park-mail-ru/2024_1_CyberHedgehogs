@@ -158,9 +158,12 @@ func (r *Renderer) DecodeJSON(body io.ReadCloser, data any) error {
 
 func (r *Renderer) EncodeJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "localhost:3030")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	//w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	js, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
 }
