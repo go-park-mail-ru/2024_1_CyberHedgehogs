@@ -38,20 +38,32 @@ func main() {
 	api := handler.NewAuthHandler(userTable, sessionTable)
 
 	r := mux.NewRouter()
-	/*
-		subRouter := r.PathPrefix("/cors/").Subrouter()
-		subRouter.Use(Middleware2(""))
-
-	*/
 	r.HandleFunc("/register", api.Registration).Methods("POST")
 	r.HandleFunc("/login", api.Login).Methods("POST")
 	r.HandleFunc("/logout", api.Logout).Methods("POST")
 	r.HandleFunc("/profile", api.GetUserProfile).Methods("GET")
 	r.HandleFunc("/posts", api.GetUserPosts).Methods("GET")
-	http.ListenAndServe(":8081",
+	/*
+
+		"Access-Control-Allow-Origin": "http://localhost:3030",
+		"Access-Control-Allow-Headers": "Content-Type",
+		"Access-Control-Allow-Credentials": true,
+	*/
+
+	http.ListenAndServe(":3031",
 		handlers.CORS(
-			handlers.AllowedOrigins([]string{"*"}),
+
+			//handlers.ContentTypeHandler(, "application/json"),
+			handlers.AllowedOrigins([]string{"http://localhost:3030"}),
 			handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
+			//	handlers.
+			//	handlers."Set-Cookie": `session_id=${crypto.randomUUID()}; max-age=60`
+			handlers.AllowCredentials(),
+			handlers.AllowedHeaders([]string{"Content-Type"}),
+			handlers.AllowedHeaders([]string{"Content-Type"}),
+			handlers.AllowedHeaders([]string{"Content-Type"}),
+			handlers.AllowedHeaders([]string{"Content-Type"}),
+			handlers.AllowedHeaders([]string{"Content-Type"}),
 			handlers.AllowedHeaders([]string{"Content-Type"}),
 		)(r))
 }

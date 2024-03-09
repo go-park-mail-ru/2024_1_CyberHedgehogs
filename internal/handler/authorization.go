@@ -148,6 +148,7 @@ func (api *AuthHandler) GetUserPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "session not found", http.StatusUnauthorized)
 		return
 	}
+
 	userPosts := map[int]*Post{
 		1: {ID: 1, Title: "Mock Post 1", Description: "Description of Mock Post 1", Author: userInfo.Login},
 		2: {ID: 2, Title: "Mock Post 2", Description: "Description of Mock Post 2", Author: userInfo.Login},
