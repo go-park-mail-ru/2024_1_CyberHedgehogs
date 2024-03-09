@@ -57,7 +57,8 @@ func (api *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `error deleting session`, http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	answ := repo.Info{"success"}
+	api.render.EncodeJSON(w, http.StatusNoContent, answ)
 }
 
 func (api *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +79,8 @@ func (api *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setSessionCookie(w, sessionID)
-	w.WriteHeader(http.StatusOK)
+	answ := repo.Info{"success"}
+	api.render.EncodeJSON(w, http.StatusOK, answ)
 }
 
 func (api *AuthHandler) Registration(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +104,9 @@ func (api *AuthHandler) Registration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setSessionCookie(w, sessionID)
-	w.WriteHeader(http.StatusOK)
+	answ := repo.Info{"success"}
+	api.render.EncodeJSON(w, http.StatusOK, answ)
+
 }
 
 type Post struct {
@@ -134,6 +138,7 @@ func (api *AuthHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.render.EncodeJSON(w, http.StatusOK, userProfile)
+
 }
 
 func (api *AuthHandler) GetUserPosts(w http.ResponseWriter, r *http.Request) {
