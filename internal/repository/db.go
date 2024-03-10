@@ -30,8 +30,10 @@ type UserTable struct {
 	mu    sync.RWMutex
 }
 
-type Info struct {
-	Message string `json:"message"`
+type Response struct {
+	Ok     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	Result any    `json:"result,omitempty"`
 }
 
 func (table *UserTable) ValidateUserCredentials(user *User) *User {
