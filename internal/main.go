@@ -1,12 +1,15 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
+	_ "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/docs"
 	"github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/handler"
 	repo "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 /*
@@ -34,7 +37,7 @@ func Middleware2(s string) mux.MiddlewareFunc {
 // @version			1.0
 // @description 	API Server for Patreon like Application
 
-// @host 			localhost:3030
+// @host 			localhost:3031
 // @BasePath 		/
 func main() {
 
@@ -56,6 +59,15 @@ func main() {
 		"Access-Control-Allow-Headers": "Content-Type",
 		"Access-Control-Allow-Credentials": true,
 	*/
+
+	r.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:3031/swagger/doc.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+		httpSwagger.DomID("swagger-ui"),
+	)).Methods(http.MethodGet)
+
+	log.Fatal(http.ListenAndServe(":3031", r))
 
 	http.ListenAndServe(":3031",
 		handlers.CORS(
