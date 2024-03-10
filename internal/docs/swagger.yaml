@@ -21,7 +21,7 @@ definitions:
       username:
         type: string
     type: object
-host: localhost:3030
+host: localhost:3031
 info:
   contact: {}
   description: API Server for Patreon like Application

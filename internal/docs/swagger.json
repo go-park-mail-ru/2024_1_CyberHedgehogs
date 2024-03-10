@@ -6,7 +6,7 @@
         "contact": {},
         "version": "1.0"
     },
-    "host": "localhost:3030",
+    "host": "localhost:3031",
     "basePath": "/",
     "paths": {
         "/login": {
@@ -22,17 +22,15 @@
                     "auth"
                 ],
                 "summary": "Login",
-                "parameters": [
-                    {
-                        "description": "User credentials",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/repository.User"
-                        }
+                "parameters": [{
+                    "description": "User credentials",
+                    "name": "request",
+                    "in": "body",
+                    "required": true,
+                    "schema": {
+                        "$ref": "#/definitions/repository.User"
                     }
-                ],
+                }],
                 "responses": {
                     "200": {
                         "description": "Successfully logged in",
@@ -71,15 +69,13 @@
                     "auth"
                 ],
                 "summary": "Logout",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
+                "parameters": [{
+                    "type": "string",
+                    "description": "Session ID",
+                    "name": "session_id",
+                    "in": "header",
+                    "required": true
+                }],
                 "responses": {
                     "204": {
                         "description": "Session deleted successfully",
@@ -112,15 +108,13 @@
                     "user"
                 ],
                 "summary": "Get user posts",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
+                "parameters": [{
+                    "type": "string",
+                    "description": "Session ID",
+                    "name": "session_id",
+                    "in": "header",
+                    "required": true
+                }],
                 "responses": {
                     "200": {
                         "description": "User posts retrieved successfully",
@@ -153,15 +147,13 @@
                     "user"
                 ],
                 "summary": "Get user profile",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
+                "parameters": [{
+                    "type": "string",
+                    "description": "Session ID",
+                    "name": "session_id",
+                    "in": "header",
+                    "required": true
+                }],
                 "responses": {
                     "200": {
                         "description": "User profile retrieved successfully",
@@ -198,17 +190,15 @@
                 ],
                 "summary": "Registration",
                 "operationId": "create-account",
-                "parameters": [
-                    {
-                        "description": "User information",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/repository.User"
-                        }
+                "parameters": [{
+                    "description": "User information",
+                    "name": "user",
+                    "in": "body",
+                    "required": true,
+                    "schema": {
+                        "$ref": "#/definitions/repository.User"
                     }
-                ],
+                }],
                 "responses": {
                     "200": {
                         "description": "Account successfully created",
