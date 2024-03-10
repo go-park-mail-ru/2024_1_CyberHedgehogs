@@ -1,0 +1,177 @@
+basePath: /
+definitions:
+  repository.Response:
+    properties:
+      error:
+        type: string
+      ok:
+        type: boolean
+      result: {}
+    type: object
+  repository.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      login:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:3031
+info:
+  contact: {}
+  description: API Server for Patreon like Application
+  title: Saudade API
+  version: "1.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login with user credentials
+      parameters:
+      - description: User credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/repository.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged in
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "400":
+          description: Invalid JSON format
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "401":
+          description: Wrong credentials
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/repository.Response'
+      summary: Login
+      tags:
+      - auth
+  /logout:
+    post:
+      description: Logout user and delete session
+      parameters:
+      - description: Session ID
+        in: header
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Session deleted successfully
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "400":
+          description: No cookie provided
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "500":
+          description: Error deleting session
+          schema:
+            $ref: '#/definitions/repository.Response'
+      summary: Logout
+      tags:
+      - auth
+  /posts:
+    get:
+      description: Get posts created by the authenticated user
+      parameters:
+      - description: Session ID
+        in: header
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User posts retrieved successfully
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "400":
+          description: No cookie provided
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "401":
+          description: Session not found
+          schema:
+            $ref: '#/definitions/repository.Response'
+      summary: Get user posts
+      tags:
+      - user
+  /profile:
+    get:
+      description: Get user profile information based on session ID
+      parameters:
+      - description: Session ID
+        in: header
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "400":
+          description: No cookie provided
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "401":
+          description: Session not found
+          schema:
+            $ref: '#/definitions/repository.Response'
+      summary: Get user profile
+      tags:
+      - user
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      operationId: create-account
+      parameters:
+      - description: User information
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/repository.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account successfully created
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/repository.Response'
+        "500":
+          description: Adding user error
+          schema:
+            $ref: '#/definitions/repository.Response'
+      summary: Registration
+      tags:
+      - auth
+swagger: "2.0"
