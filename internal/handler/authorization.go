@@ -1,9 +1,10 @@
 package handler
 
 import (
-	repo "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
 	"net/http"
 	"time"
+
+	repo "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
 )
 
 const (
@@ -45,6 +46,16 @@ func NewAuthHandler(ur UserRepository, sm SessionManager) AuthHandler {
 	return handler
 }
 
+// Logout godoc
+// @Summary Logout
+// @Description Logout user and delete session
+// @Tags auth
+// @Produce json
+// @Param session_id header string true "Session ID"
+// @Success 204 {object} repo.Response "Session deleted successfully"
+// @Failure 400 {object} repo.Response "No cookie provided"
+// @Failure 500 {object} repo.Response "Error deleting session"
+// @Router /logout [post]
 func (api *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	sessionCookie, err := r.Cookie("session_id")
@@ -65,6 +76,18 @@ func (api *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	api.render.EncodeJSON(w, http.StatusNoContent, answ)
 }
 
+// Login handles the user login request.
+// @Summary Login
+// @Description Login with user credentials
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body repo.User true "User credentials"
+// @Success 200 {object} repo.Response "Successfully logged in"
+// @Failure 400 {object} repo.Response "Invalid JSON format"
+// @Failure 401 {object} repo.Response "Wrong credentials"
+// @Failure 500 {object} repo.Response "Internal server error"
+// @Router /login [post]
 func (api *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var user repo.User
 	if err := api.render.DecodeJSON(r.Body, &user); err != nil {
@@ -90,6 +113,18 @@ func (api *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	api.render.EncodeJSON(w, http.StatusOK, answ)
 }
 
+// Registration handles the user registration request.
+// @Summary Registration
+// @Tags auth
+// @Description Create a new user account
+// @ID create-account
+// @Accept json
+// @Produce json
+// @Param user body repo.User true "User information"
+// @Success 200 {object} repo.Response "Account successfully created"
+// @Failure 400 {object} repo.Response "Bad Request"
+// @Failure 500 {object} repo.Response "Adding user error"
+// @Router /register [post]
 func (api *AuthHandler) Registration(w http.ResponseWriter, r *http.Request) {
 	var user repo.User
 	err := api.render.DecodeJSON(r.Body, &user)
@@ -129,6 +164,16 @@ type Post struct {
 	AuthorID    int    `json:"author_id,omitempty"`
 }
 
+// GetUserProfile
+// @Summary Get user profile
+// @Description Get user profile information based on session ID
+// @Tags user
+// @Produce json
+// @Param session_id header string true "Session ID"
+// @Success 200 {object} repo.Response "User profile retrieved successfully"
+// @Failure 400 {object} repo.Response "No cookie provided"
+// @Failure 401 {object} repo.Response "Session not found"
+// @Router /profile [get]
 func (api *AuthHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
 	sessionCookie, err := r.Cookie("session_id")
 	if err != nil {
@@ -155,6 +200,16 @@ func (api *AuthHandler) GetUserProfile(w http.ResponseWriter, r *http.Request) {
 	api.render.EncodeJSON(w, http.StatusOK, answ)
 }
 
+// GetUserPosts
+// @Summary Get user posts
+// @Description Get posts created by the authenticated user
+// @Tags user
+// @Produce json
+// @Param session_id header string true "Session ID"
+// @Success 200 {object} repo.Response "User posts retrieved successfully"
+// @Failure 400 {object} repo.Response "No cookie provided"
+// @Failure 401 {object} repo.Response "Session not found"
+// @Router /posts [get]
 func (api *AuthHandler) GetUserPosts(w http.ResponseWriter, r *http.Request) {
 	sessionCookie, err := r.Cookie("session_id")
 	if err != nil {
