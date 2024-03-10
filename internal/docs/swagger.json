@@ -6,7 +6,7 @@
         "contact": {},
         "version": "1.0"
     },
-    "host": "localhost:3030",
+    "host": "localhost:3031",
     "basePath": "/",
     "paths": {
         "/login": {
