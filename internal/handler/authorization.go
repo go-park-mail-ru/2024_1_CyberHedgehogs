@@ -13,9 +13,11 @@ const (
 
 func setSessionCookie(w http.ResponseWriter, sessionID string) {
 	cookie := &http.Cookie{
-		Name:    SessionCookieName,
-		Value:   sessionID,
-		Expires: time.Now().Add(SessionCookieExpires),
+		Name:     SessionCookieName,
+		Value:    sessionID,
+		Expires:  time.Now().Add(SessionCookieExpires),
+		Secure:   true,
+		HttpOnly: true,
 	}
 	http.SetCookie(w, cookie)
 }
