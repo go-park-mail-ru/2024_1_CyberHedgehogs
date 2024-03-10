@@ -1,11 +1,12 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/handler"
 	repo "github.com/go-park-mail-ru/2024_1_CyberHedgehogs/internal/repository"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"net/http"
 )
 
 /*
@@ -29,6 +30,12 @@ func Middleware2(s string) mux.MiddlewareFunc {
 
 */
 
+// @title			Saudade API
+// @version			1.0
+// @description 	API Server for Patreon like Application
+
+// @host 			localhost:3030
+// @BasePath 		/
 func main() {
 
 	userTable := &repo.UserTable{}
